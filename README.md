@@ -12,7 +12,7 @@ Tested With the following:
 
 Ansible Core 2.15.10
 
-### Ansible Collections:
+### Ansible Collections
 
 infra.osbuild 2.3.0  
 redhat.rhel_system_roles 1.23.0  
