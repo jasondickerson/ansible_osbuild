@@ -1,0 +1,10 @@
+echo """
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+""" > /etc/pki/ca-trust/source/anchors/localhost.crt
+update-ca-trust
+

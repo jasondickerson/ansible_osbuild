@@ -1,0 +1,102 @@
+---
+- name: Setup OSbuild and Build Web Repository
+  hosts: all
+  gather_facts: false
+  become: true
+  vars:
+    # this can be an extra_var
+    blueprint_to_use: rhde
+
+  tasks:
+    - name:  Initialize Variables
+      tags:
+        - always
+      block:
+        - name: Import Blueprint variables
+          ansible.builtin.include_vars:
+            file: "{{ blueprint_to_use }}.yml"
+
+        - name: Gather Facts
+          ansible.builtin.setup:
+
+    - name: Configure osbuild webserver
+      tags:
+        - configure_server
+      block:
+        - name: Setup build server
+          ansible.builtin.import_role:
+            name: infra.osbuild.setup_server
+
+        - name: Configure https package
+          ansible.builtin.package:
+            name: mod_ssl
+            state: present
+
+        - name: Start httpd daemon with https
+          ansible.builtin.systemd_service:
+            state: restarted
+            name: httpd
+
+        - name: Configure Firewall
+          ansible.builtin.import_role:
+            name: redhat.rhel_system_roles.firewall
+          vars:
+            firewall:
+              - service:
+                - http
+                - https
+                - ssh
+                - cockpit
+                - dhcpv6-client
+                state: enabled
+
+    - name: Publish OS Commit
+      tags:
+        - commit
+      block:
+        - name: Create OS Commit
+          ansible.builtin.import_role:
+            name: infra.osbuild.builder
+          vars:
+            builder_compose_type: edge-commit
+            builder_custom_repos: "{{ commit_builder_custom_repos if commit_builder_custom_repos is defined else None | default(None) }}"
+
+        - name: Get List of commits
+          ansible.builtin.shell:
+            cmd: "set -o pipefail ; /usr/bin/ostree --repo=/var/www/html/{{ builder_blueprint_name }}/repo log {{ builder_blueprint_ref }} | /usr/bin/grep ^commit | /usr/bin/sed -e s/'commit '//g"
+          changed_when: false
+          register: commit_list
+
+        - name: Generate Static Deltas
+          ansible.builtin.include_tasks:
+            file: generate_static_deltas_tasks.yml
+          when:
+            - commit_list.stdout_lines is defined
+            - commit_list.stdout_lines | length > 1 
+
+        - name: Generate Repo Summary
+          ansible.builtin.command:
+            cmd: "/usr/bin/ostree --repo=/var/www/html/{{ builder_blueprint_name }}/repo summary -u"            
+
+    - name: Publish Installer ISO
+      tags:
+        - installer
+      block:
+        - name: Build Edge ISO
+          ansible.builtin.import_role:
+           name: infra.osbuild.builder
+          vars:
+            builder_compose_type: edge-installer
+            builder_ostree_url: "{{ installer_builder_ostree_url }}"
+
+        - name: Display Image Path
+          ansible.builtin.debug:
+            var: builder_image_path
+
+    - name: Show additional_kickstart_post
+      ansible.builtin.debug:
+        var: additional_kickstart_post
+      tags:
+        - show_kickstart_post
+...
+

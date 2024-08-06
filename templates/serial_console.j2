@@ -1,0 +1,60 @@
+
+cat > /tmp/enable_serial_console.bash << '__EOF__'
+#!/bin/bash
+rpm-ostree kargs --append=console=tty0 --append=console=ttyS0,115200n8
+RC=${?}
+if [ ${RC} != 0 ] ; then
+  echo rpm-ostree karg failure: ${RC}
+  exit ${RC}
+fi
+systemctl disable enable_serial_console.service
+RC=${?}
+if [ ${RC} != 0 ] ; then
+  echo systemctl disable failure: ${RC}
+  exit ${RC}
+fi
+rm -rf /etc/systemd/system/enable_serial_console.service
+RC=${?}
+if [ ${RC} != 0 ] ; then
+  echo service unit deletion failure: ${RC}
+  exit ${RC}
+fi
+systemctl daemon-reload
+if [ ${RC} != 0 ] ; then
+  echo systemctl daemon-reload failure: ${RC}
+  exit ${RC}
+fi
+systemd-run --on-active=5 /usr/bin/systemctl reboot
+RC=${?}
+if [ ${RC} != 0 ] ; then
+  echo systemd-run reboot failure: ${RC}
+  exit ${RC}
+fi
+__EOF__
+
+chown root:root /tmp/enable_serial_console.bash
+chmod 755 /tmp/enable_serial_console.bash
+
+cat > /etc/systemd/system/enable_serial_console.service << '__EOF__'
+
+# enable_serial_console.service
+[Unit]
+Wants=multi-user.target
+After=multi-user.target
+ConditionPathExists=/tmp/enable_serial_console.bash
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -lc "/tmp/enable_serial_console.bash"
+ExecStartPost=/usr/bin/rm /tmp/enable_serial_console.bash
+
+[Install]
+WantedBy=default.target
+__EOF__
+
+chown root:root /etc/systemd/system/enable_serial_console.service
+chmod 644 /etc/systemd/system/enable_serial_console.service
+
+echo '##### Enable the Serial Console #####'
+systemctl enable enable_serial_console.service
+

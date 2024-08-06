@@ -1,0 +1,96 @@
+---
+### Common osbuild variables
+
+# builder_request_timeout: 120
+builder_request_timeout: 600
+
+builder_blueprint_name: rhde
+
+builder_compose_pkgs:
+  - "ansible-navigator"
+  - "glibc-langpack-en"
+  - "podman"
+  - "clevis"
+  - "clevis-luks"
+  - "clevis-systemd"
+  - "clevis-udisks2"
+  - "cronie"
+
+builder_compose_customizations:
+  fips: true
+  locale:
+    languages: ["en_US.UTF-8"]
+    keyboard: us
+
+builder_kickstart_post_user:
+  - name: admin_user
+    description: "Admin user"
+    password: '$6$...$...'
+    public_keys:
+      - "ssh-rsa ..."
+    groups:
+      - wheel
+    home: "/var/home/admin_user"
+    sudo: true
+    sudo_no_password: true
+    keygen: true
+    trust_own_ssh_pubkey: true
+  - name: containers
+    description: "containers user"
+    password: '$6$...$...'
+    public_keys: []
+    groups:
+      - wheel
+    home: "/var/home/containers"
+    sudo: false
+    sudo_no_password: false
+    keygen: true
+    trust_own_ssh_pubkey: true
+
+
+additional_kickstart_post:
+  - "{{ lookup('ansible.builtin.template', 'templates/tpm_encyrption.j2') }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/opt.j2') }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/cert_trust.j2') }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/hosts.j2') }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/ostree-repository.j2') }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/user_creation.j2') if builder_kickstart_post_user is defined else None | default(None) }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/serial_console.j2') }}"
+  - "{{ lookup('ansible.builtin.template', 'templates/files.j2') }}"
+
+builder_blueprint_ref: rhel/8/x86_64/edge
+
+builder_kickstart_options:
+  - lang en_US.UTF-8
+  - keyboard us
+  - timezone Etc/UTC --utc
+  - text
+  - zerombr
+  - clearpart --all --initlabel
+  - autopart --type=lvm --fstype=xfs --nohome --encrypted --passphrase=changeme
+  - reboot
+  - network --bootproto=dhcp
+  - services --enabled=ostree-remount
+  - ostreesetup --nogpg --osname=rhel --remote=edge --url=file:///run/install/repo/ostree/repo --ref={{ builder_blueprint_ref }}
+
+# Above is for kickstart to install from local filesystem, like an Installation ISO.
+# Below is for kickstart to install from a Web based OSTree repository
+##  - ostreesetup --nogpg --osname=rhel --remote=edge --url=http://{{ builder_system_ipv4 }}/{{ builder_blueprint_name }}/repo/ --ref={{ builder_blueprint_ref }}
+
+# External FQDN/IP of the OSTree Web repository used for creating the OSTree Remote (os update source)
+builder_kickstart_update_repo: "10.0.0.1"
+
+### Build specific osbuild variables
+
+commit_builder_custom_repos:
+  - name: AAP Local Repository
+    base_url: "file:///var/repos/ansible-automation-platform-setup-bundle-2.4-7-x86_64/bundle/packages/el8/repos/"
+    type: yum-baseurl
+    check_ssl: false
+    check_gpg: false
+    rhsm: false
+    state: present
+
+# Local URL to repo using either the local hostname, FQDN, or IP.  Used for pulling OS Commits into ISO's
+installer_builder_ostree_url: "http://10.0.0.1/{{ builder_blueprint_name }}/repo/"
+...

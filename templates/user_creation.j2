@@ -1,0 +1,35 @@
+{% if builder_kickstart_post_user | length > 0 %}
+{% for user in builder_kickstart_post_user %}
+echo POST-USER add {{ user.name }}
+useradd -c "{{ user.description }}" {{ "-d " + user.home if user.home is defined else None | default(None) }} {{ "-G " + user.groups | join(",") if user.groups is defined else None | default(None) }} -m -p '{{ user.password }}' {{ user.name }}
+USER_HOME=$(getent passwd {{ user.name }} | awk -F: '{print $6}')
+mkdir -p ${USER_HOME}/.ssh
+chown {{ user.name }}:{{ user.name }} ${USER_HOME}/.ssh
+chmod 700 ${USER_HOME}/.ssh
+touch ${USER_HOME}/.ssh/authorized_keys
+chmod 600 ${USER_HOME}/.ssh/authorized_keys
+chown {{ user.name }}:{{ user.name }} ${USER_HOME}/.ssh/authorized_keys
+{% if user.public_keys | length > 0 %}
+echo POST-USER add {{ user.name }} SSH Public Key
+cat <<'__AUTHKEYS__' >> ${USER_HOME}/.ssh/authorized_keys
+{% for public_key in user.public_keys %}
+{{ public_key }}
+{% endfor %}
+__AUTHKEYS__
+{% endif %}
+{% if user.sudo is defined and user.sudo %}
+echo POST-USER add {{ user.name }} to sudoers.d
+echo -e "{{ user.name }}\tALL=(ALL)\t{{ "NOPASSWD: " if user.sudo_no_password else None | default(None) }}ALL\n" >> /etc/sudoers.d/{{ user.name }}
+{% endif %}
+{% if user.keygen is defined and user.keygen %}
+echo POST-USER generate SSH Key Pair
+ssh-keygen -N '' -f ${USER_HOME}/.ssh/id_rsa
+chown {{ user.name }}:{{ user.name }} ${USER_HOME}/.ssh/id_rsa*
+{% endif %}
+{% if user.trust_own_ssh_pubkey is defined and user.trust_own_ssh_pubkey %}
+echo POST-USER trust own SSH Public Key
+cat ${USER_HOME}/.ssh/id_rsa.pub >> ${USER_HOME}/.ssh/authorized_keys
+{% endif %}
+
+{% endfor %}
+{% endif %}

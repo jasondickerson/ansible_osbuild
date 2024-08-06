@@ -1,0 +1,6 @@
+
+for PARTITION in $(lsblk -lo NAME,PKNAME | grep ^luks | cut -d" " -f2) ; do
+  clevis luks bind -y -k - -d /dev/${PARTITION} tpm2 '{}' <<< "changeme"
+  cryptsetup luksRemoveKey /dev/${PARTITION} <<< "changeme"
+done
+

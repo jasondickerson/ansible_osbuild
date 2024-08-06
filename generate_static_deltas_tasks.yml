@@ -1,0 +1,6 @@
+---
+- name: Generate Static Deltas
+  ansible.builtin.command:
+    cmd: "/usr/bin/ostree static-delta generate --repo=/var/www/html/{{ builder_blueprint_name }}/repo --from={{ commit_list.stdout_lines[item | int] }} --to={{ commit_list.stdout_lines[0] }}"
+  changed_when: true
+  with_sequence: start=1 end="{{ commit_list.stdout_lines | length - 1 | int }}"
