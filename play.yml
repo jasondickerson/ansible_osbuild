@@ -8,7 +8,7 @@
     blueprint_to_use: rhde
 
   tasks:
-    - name:  Initialize Variables
+    - name: Initialize Variables
       tags:
         - always
       block:
@@ -43,11 +43,11 @@
           vars:
             firewall:
               - service:
-                - http
-                - https
-                - ssh
-                - cockpit
-                - dhcpv6-client
+                  - http
+                  - https
+                  - ssh
+                  - cockpit
+                  - dhcpv6-client
                 state: enabled
 
     - name: Publish OS Commit
@@ -72,11 +72,11 @@
             file: generate_static_deltas_tasks.yml
           when:
             - commit_list.stdout_lines is defined
-            - commit_list.stdout_lines | length > 1 
+            - commit_list.stdout_lines | length > 1
 
         - name: Generate Repo Summary
           ansible.builtin.command:
-            cmd: "/usr/bin/ostree --repo=/var/www/html/{{ builder_blueprint_name }}/repo summary -u"            
+            cmd: "/usr/bin/ostree --repo=/var/www/html/{{ builder_blueprint_name }}/repo summary -u"
 
     - name: Publish Installer ISO
       tags:
@@ -84,7 +84,7 @@
       block:
         - name: Build Edge ISO
           ansible.builtin.import_role:
-           name: infra.osbuild.builder
+            name: infra.osbuild.builder
           vars:
             builder_compose_type: edge-installer
             builder_ostree_url: "{{ installer_builder_ostree_url }}"
@@ -99,4 +99,3 @@
       tags:
         - show_kickstart_post
 ...
-
